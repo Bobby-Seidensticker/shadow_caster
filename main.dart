@@ -42,25 +42,46 @@ Future<Image> imageFromFilename(String filename, int widthInPixels) async {
   return (await cmd.getImage())!;
 }
 
+Future<Image> processImage(
+    String filename, int widthInPixels, int numberOfColors) async {
+  final image = await imageFromFilename(filename, widthInPixels);
+  await File('${filename}_${widthInPixels}.png').writeAsBytes(encodePng(image));
+
+  final ditheredImage = ditherImage(image,
+      quantizer: NeuralQuantizer(image, numberOfColors: numberOfColors),
+      kernel: DitherKernel.atkinson);
+
+  await File('${filename}_${widthInPixels}_dithered_${numberOfColors}.png')
+      .writeAsBytes(encodePng(ditheredImage));
+
+  return ditheredImage;
+}
+
 void main() async {
   // Input image filenames, assumed to be squares.
   const horizImageFilename = 'talia_headshot.jpg';
   const vertImageFilename = 'silas_headshot.jpg';
-  const widthInPixels = 75; // How wide the image should be.  Values over 20 mean the render time will be very long.
+  // How wide the image should be.  Values over 20 mean the render time will be very long.
+  const widthInPixels = 50;
   const doHorizImage = true;
   const doVertImage = true;
   // The width of a cell (1 pixel) in mm. This includes the wall's width, so the flat area to be
   // shaded is cellSize-wallWidth
   const cellSize = 2;
-  const wallWidth = 0.6;
-  const bottomThk = 1.0;
+  const wallWidth = 0.4;
+  const bottomThk = 0.8;
+  const layerHeight = 0.1;
   // The maximum height of a wall. If a pixel is black, the wall will be this many mm over the base.
   // Max height is as tall as the non-wall width of the cell, ideal light source would be at a 45 degree angle.
   const maxHeight = cellSize - wallWidth;
+  final numberOfColors = (maxHeight / layerHeight).floor();
   const border = cellSize;
 
-  final horizImage = await imageFromFilename(horizImageFilename, widthInPixels);
-  final vertImage = await imageFromFilename(vertImageFilename, widthInPixels);
+  final horizImage =
+      await processImage(horizImageFilename, widthInPixels, numberOfColors);
+
+  final vertImage =
+      await processImage(vertImageFilename, widthInPixels, numberOfColors);
   final outFile = File('output.scad');
   final outSink = outFile.openWrite();
 
