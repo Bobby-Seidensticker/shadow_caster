@@ -48,7 +48,7 @@ Future<Image> processImage(
   await File('${filename}_${widthInPixels}.png').writeAsBytes(encodePng(image));
 
   final ditheredImage = ditherImage(image,
-      quantizer: NeuralQuantizer(image, numberOfColors: numberOfColors),
+      quantizer: NeuralQuantizer(image, numberOfColors: numberOfColors, samplingFactor: 1),
       kernel: DitherKernel.atkinson);
 
   await File('${filename}_${widthInPixels}_dithered_${numberOfColors}.png')
@@ -59,30 +59,33 @@ Future<Image> processImage(
 
 void main() async {
   // Input image filenames, assumed to be squares.
-  const horizImageFilename = 'talia_headshot.jpg';
-  const vertImageFilename = 'silas_headshot.jpg';
+  const horizImageFilename = 'talia_recent.jpg';//'talia_headshot.jpg';
+  const vertImageFilename = 'silas_recent.jpg';//'silas_headshot.jpg';
   // How wide the image should be.  Values over 20 mean the render time will be very long.
-  const widthInPixels = 50;
+  const widthInPixels = 100;
   const doHorizImage = true;
   const doVertImage = true;
   // The width of a cell (1 pixel) in mm. This includes the wall's width, so the flat area to be
   // shaded is cellSize-wallWidth
-  const cellSize = 2;
+  const cellSize = 2.1;
   const wallWidth = 0.4;
   const bottomThk = 0.8;
   const layerHeight = 0.1;
   // The maximum height of a wall. If a pixel is black, the wall will be this many mm over the base.
   // Max height is as tall as the non-wall width of the cell, ideal light source would be at a 45 degree angle.
-  const maxHeight = cellSize - wallWidth;
+  const maxHeight = (cellSize - wallWidth);
   final numberOfColors = (maxHeight / layerHeight).floor();
   const border = cellSize;
 
   final horizImage =
-      await processImage(horizImageFilename, widthInPixels, numberOfColors);
+  await processImage(horizImageFilename, widthInPixels, numberOfColors);
 
   final vertImage =
-      await processImage(vertImageFilename, widthInPixels, numberOfColors);
-  final outFile = File('output.scad');
+  await processImage(vertImageFilename, widthInPixels, numberOfColors);
+
+  final outputFilename = '${widthInPixels}px_${cellSize}cell_${wallWidth}wall_${maxHeight}maxHeight.scad';
+  print('writing to $outputFilename');
+  final outFile = File(outputFilename);
   final outSink = outFile.openWrite();
 
   final leftWalls = <String>[];
