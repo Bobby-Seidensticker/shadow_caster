@@ -48,7 +48,8 @@ Future<Image> processImage(
   await File('${filename}_${widthInPixels}.png').writeAsBytes(encodePng(image));
 
   final ditheredImage = ditherImage(image,
-      quantizer: NeuralQuantizer(image, numberOfColors: numberOfColors, samplingFactor: 1),
+      quantizer: NeuralQuantizer(image,
+          numberOfColors: numberOfColors, samplingFactor: 1),
       kernel: DitherKernel.atkinson);
 
   await File('${filename}_${widthInPixels}_dithered_${numberOfColors}.png')
@@ -57,33 +58,74 @@ Future<Image> processImage(
   return ditheredImage;
 }
 
-void main() async {
+// Configuration class to hold all the constant variables
+class ImageConfig {
   // Input image filenames, assumed to be squares.
-  const horizImageFilename = 'talia_recent.jpg';//'talia_headshot.jpg';
-  const vertImageFilename = 'silas_recent.jpg';//'silas_headshot.jpg';
+  final String horizImageFilename;
+  final String vertImageFilename;
   // How wide the image should be.  Values over 20 mean the render time will be very long.
-  const widthInPixels = 100;
-  const doHorizImage = true;
-  const doVertImage = true;
+  final int widthInPixels;
+  final bool doHorizImage;
+  final bool doVertImage;
   // The width of a cell (1 pixel) in mm. This includes the wall's width, so the flat area to be
   // shaded is cellSize-wallWidth
-  const cellSize = 2.1;
-  const wallWidth = 0.4;
-  const bottomThk = 0.8;
-  const layerHeight = 0.1;
+  final double cellSize;
+  final double wallWidth;
+  final double bottomThk;
+  final double layerHeight;
   // The maximum height of a wall. If a pixel is black, the wall will be this many mm over the base.
   // Max height is as tall as the non-wall width of the cell, ideal light source would be at a 45 degree angle.
-  const maxHeight = (cellSize - wallWidth);
-  final numberOfColors = (maxHeight / layerHeight).floor();
-  const border = cellSize;
+  double get maxHeight => cellSize - wallWidth;
+  double get border => cellSize;
 
-  final horizImage =
-  await processImage(horizImageFilename, widthInPixels, numberOfColors);
+  // Calculated number of colors based on maxHeight and layerHeight
+  //
+  // Subtract one because every cell must have a wall to avoid blank spots.
+  int get numberOfColors => (maxHeight / layerHeight).floor() - 1;
 
-  final vertImage =
-  await processImage(vertImageFilename, widthInPixels, numberOfColors);
+  // Constructor to initialize all the variables
+  const ImageConfig({
+    this.horizImageFilename = 'talia_recent.jpg',
+    this.vertImageFilename = 'silas_recent.jpg',
+    this.widthInPixels = 100,
+    this.doHorizImage = true,
+    this.doVertImage = true,
+    this.cellSize = 2.1,
+    this.wallWidth = 0.4,
+    this.bottomThk = 0.8,
+    this.layerHeight = 0.1,
+  });
+}
 
-  final outputFilename = '${widthInPixels}px_${cellSize}cell_${wallWidth}wall_${maxHeight}maxHeight.scad';
+void main() async {
+  // Create an instance of ImageConfig with your desired constants
+  const defaultConfig = ImageConfig();
+  const p2Config = ImageConfig(
+      widthInPixels: 50,
+      cellSize: 1,
+      wallWidth: 0.2,
+      bottomThk: 0.4,
+      layerHeight: 0.05);
+  const p3Config = ImageConfig(
+      widthInPixels: 85,
+      cellSize: 1.1,
+      wallWidth: 0.22,
+      bottomThk: 0.6,
+      layerHeight: 0.05);
+  const config = p3Config;
+
+  await generate(p3Config);
+}
+
+Future<void> generate(ImageConfig config) async {
+  final horizImage = await processImage(
+      config.horizImageFilename, config.widthInPixels, config.numberOfColors);
+
+  final vertImage = await processImage(
+      config.vertImageFilename, config.widthInPixels, config.numberOfColors);
+
+  final outputFilename =
+      '${config.widthInPixels}px_${config.cellSize}cell_${config.wallWidth}wall_${config.maxHeight}maxHeight.scad';
   print('writing to $outputFilename');
   final outFile = File(outputFilename);
   final outSink = outFile.openWrite();
@@ -91,64 +133,71 @@ void main() async {
   final leftWalls = <String>[];
   final upWalls = <String>[];
 
-  final actualWidthMm = widthInPixels * cellSize + border * 2;
+  final actualWidthMm =
+      config.widthInPixels * config.cellSize + config.border * 2;
   final actualWidthIn = actualWidthMm / 25.4;
 
   print(
-      'Including a ${border}mm border, the overall width is ${actualWidthMm}mm, '
+      'Including a ${config.border}mm border, the overall width is ${actualWidthMm}mm, '
       'or ${actualWidthIn}in');
 
-  if (doHorizImage) {
-    for (int y = 0; y < widthInPixels; y++) {
-      for (int x = 0; x < widthInPixels; x++) {
+  if (config.doHorizImage) {
+    for (int y = 0; y < config.widthInPixels; y++) {
+      for (int x = 0; x < config.widthInPixels; x++) {
         // Get the value from 0 (black) to 1 (white) of the red channel.  The image is greyscale so
         // the channels should all be equal to each other.
         final val = horizImage.getPixel(x, y).r;
-        final wallHeight = (1 - val / 256) * maxHeight;
+        final wallHeight =
+            (1 - val / 256) * (config.maxHeight - config.layerHeight);
 
         leftWalls.add('''
-  back(${border + y * cellSize})
-  right(${border + x * cellSize})
-  up(0.1)
-    cuboid([$wallWidth+0.01, $cellSize+0.01, ${bottomThk + wallHeight - 0.1}], align=V_RIGHT+V_BACK+V_UP);''');
+          back(${config.border + y * config.cellSize})
+          right(${config.border + x * config.cellSize})
+          up(0.1)
+          cuboid([${config.wallWidth + 0.01}, ${config.cellSize + 0.01}, ${config.bottomThk - 0.1 + wallHeight + config.layerHeight}], align=V_RIGHT+V_BACK+V_UP);''');
       }
     }
   }
-  if (doVertImage) {
-    for (int y = 0; y < widthInPixels; y++) {
-      for (int x = 0; x < widthInPixels; x++) {
+  if (config.doVertImage) {
+    for (int y = 0; y < config.widthInPixels; y++) {
+      for (int x = 0; x < config.widthInPixels; x++) {
         final val = vertImage.getPixel(x, y).r;
-        final wallHeight = (1 - val / 256) * maxHeight;
+        final wallHeight =
+            (1 - val / 256) * (config.maxHeight - config.layerHeight);
 
         upWalls.add('''
-  back(${border + y * cellSize})
-  right(${border + x * cellSize})
-  up(0.1)
-    cuboid([$cellSize+0.01, $wallWidth+0.01, ${bottomThk + wallHeight - 0.1}], align=V_RIGHT+V_BACK+V_UP);''');
+          back(${config.border + y * config.cellSize})
+          right(${config.border + x * config.cellSize})
+          up(0.1)
+          cuboid([${config.cellSize + 0.01}, ${config.wallWidth + 0.01}, ${config.bottomThk - 0.1 + wallHeight + config.layerHeight}], align=V_RIGHT+V_BACK+V_UP);''');
       }
     }
   }
 
   outSink.write('''
-include <BOSL/constants.scad>
-use <BOSL/transforms.scad>
-use <BOSL/shapes.scad>
-use <BOSL/masks.scad>
-use <BOSL/math.scad>
-use <base.scad>
+    include <BOSL/constants.scad>
+    use <BOSL/transforms.scad>
+    use <BOSL/shapes.scad>
+    use <BOSL/masks.scad>
+    use <BOSL/math.scad>
 
-\$fs=.5;
-\$fa=1;
+    \$fs=.5;
+    \$fa=1;
 
-union() {
-  cuboid([${border * 2 + cellSize * horizImage.width}, ${border * 2 + cellSize * horizImage.height}, $bottomThk],
-      align=V_RIGHT+V_BACK+V_UP);
+    union() {
+      /*cuboid([${config.border * 2 + config.cellSize * horizImage.width + 20}, ${config.border * 2 + config.cellSize * horizImage.height + 20}, 
+      right(10)
+      back(10)*/
+      union() {
+        cuboid([${config.border * 2 + config.cellSize * horizImage.width}, ${config.border * 2 + config.cellSize * horizImage.height}, ${config.bottomThk}],
+          align=V_RIGHT+V_BACK+V_UP);
 
-  // Left walls
-  ${leftWalls.join('\n')}
+        // Left walls
+        ${leftWalls.join('\n')}
 
-  // Up walls
-  ${upWalls.join('\n')}
-}
-''');
+        // Up walls
+        ${upWalls.join('\n')}
+      }
+    }
+    ''');
 }
