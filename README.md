@@ -4,7 +4,7 @@ Shadow Caster is a tool that generates 3D printable objects capable of casting d
 
 ## 🌐 **Try it Online**
 
-**Live Demo:** https://yourusername.github.io/shadow_caster/
+**Live Demo:** https://bobby-seidensticker.github.io/shadow_caster/
 
 Upload your images and generate STL files directly in your browser - no installation required!
 
@@ -77,4 +77,4 @@ See [LICENSE](LICENSE) file for details.
 
 ---
 
-**Live Demo:** https://yourusername.github.io/shadow_caster/
+**Live Demo:** https://bobby-seidensticker.github.io/shadow_caster/
