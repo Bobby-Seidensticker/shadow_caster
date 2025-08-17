@@ -101,18 +101,29 @@ export function generateShadowCasterGeometry(
   };
 }
 
+// Material cache to reuse materials
+const materialCache = new Map<string, THREE.Material>();
+
+function getMaterial(color: number): THREE.Material {
+  const key = color.toString();
+  if (!materialCache.has(key)) {
+    materialCache.set(key, new THREE.MeshLambertMaterial({ color }));
+  }
+  return materialCache.get(key)!;
+}
+
 export function createThreeGeometry(geometry: ShadowCasterGeometry): THREE.Group {
   const group = new THREE.Group();
 
   // Create base
   const baseGeometry = new THREE.BoxGeometry(...geometry.base.size);
-  const baseMaterial = new THREE.MeshLambertMaterial({ color: 0x888888 });
+  const baseMaterial = getMaterial(0x888888);
   const baseMesh = new THREE.Mesh(baseGeometry, baseMaterial);
   baseMesh.position.set(...geometry.base.position);
   group.add(baseMesh);
 
-  // Create wall material
-  const wallMaterial = new THREE.MeshLambertMaterial({ color: 0xcccccc });
+  // Get wall material (reused for all walls)
+  const wallMaterial = getMaterial(0xcccccc);
 
   // Create left walls
   geometry.leftWalls.forEach(wall => {
@@ -131,6 +142,30 @@ export function createThreeGeometry(geometry: ShadowCasterGeometry): THREE.Group
   });
 
   return group;
+}
+
+export function disposeGroup(group: THREE.Group): void {
+  group.traverse((child) => {
+    if (child instanceof THREE.Mesh) {
+      // Dispose geometry
+      if (child.geometry) {
+        child.geometry.dispose();
+      }
+      
+      // Note: We don't dispose materials here since they're cached
+      // Materials will be disposed when disposeMaterialCache is called
+    }
+  });
+  
+  // Remove all children
+  while (group.children.length > 0) {
+    group.remove(group.children[0]);
+  }
+}
+
+export function disposeMaterialCache(): void {
+  materialCache.forEach(material => material.dispose());
+  materialCache.clear();
 }
 
 export function calculateSceneBounds(geometry: ShadowCasterGeometry): {

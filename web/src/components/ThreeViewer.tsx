@@ -4,11 +4,14 @@ import { OrbitControls } from 'three-stdlib';
 import { 
   generateShadowCasterGeometry, 
   createThreeGeometry, 
-  calculateSceneBounds
+  calculateSceneBounds,
+  disposeGroup,
+  disposeMaterialCache
 } from '../utils/geometryGenerator';
 import type { ProcessedImageData } from '../utils/imageProcessing';
 import type { ComputedImageConfig } from '../types/ImageConfig';
 import type { ShadowCasterGeometry } from '../utils/geometryGenerator';
+import { memoryMonitor } from '../utils/memoryMonitor';
 
 interface ThreeViewerProps {
   horizImageData: ProcessedImageData | null;
@@ -74,16 +77,15 @@ export function ThreeViewer({
     controls.maxDistance = 200;
     controlsRef.current = controls;
 
-    // Add axes helper
-    const axesHelper = new THREE.AxesHelper(20);
-    scene.add(axesHelper);
-
     mountRef.current.appendChild(renderer.domElement);
 
     // Animation loop
     const animate = () => {
       requestAnimationFrame(animate);
-      controls.update();
+      // Only update controls if damping is enabled and controls exist
+      if (controlsRef.current?.enableDamping) {
+        controlsRef.current.update();
+      }
       renderer.render(scene, camera);
     };
     animate();
@@ -104,6 +106,21 @@ export function ThreeViewer({
 
     return () => {
       window.removeEventListener('resize', handleResize);
+      
+      // Dispose of controls
+      if (controlsRef.current) {
+        controlsRef.current.dispose();
+      }
+      
+      // Dispose of geometry and materials
+      if (geometryGroupRef.current) {
+        disposeGroup(geometryGroupRef.current);
+      }
+      
+      // Dispose of cached materials
+      disposeMaterialCache();
+      
+      // Dispose of renderer
       if (mountRef.current && renderer.domElement) {
         mountRef.current.removeChild(renderer.domElement);
       }
@@ -117,10 +134,20 @@ export function ThreeViewer({
     }
 
     setIsLoading(true);
+    
+    // Monitor memory usage during geometry generation
+    if (process.env.NODE_ENV === 'development') {
+      memoryMonitor.logMemory('before geometry generation');
+    }
 
-    // Remove existing geometry
+    // Check if this is first load before removing existing geometry
+    const hadExistingGeometry = geometryGroupRef.current !== null;
+
+    // Remove and dispose existing geometry
     if (geometryGroupRef.current) {
       sceneRef.current.remove(geometryGroupRef.current);
+      disposeGroup(geometryGroupRef.current);
+      geometryGroupRef.current = null;
     }
 
     try {
@@ -145,36 +172,52 @@ export function ThreeViewer({
 
       sceneRef.current.add(geometryGroup);
 
-      // Calculate bounds and adjust camera
+      // Calculate bounds and adjust camera only on first geometry load
       const bounds = calculateSceneBounds(shadowCasterGeometry);
       
       if (cameraRef.current && controlsRef.current) {
         const camera = cameraRef.current;
         const controls = controlsRef.current;
 
-        // Position camera to view the entire model
-        const maxDimension = Math.max(bounds.size.x, bounds.size.y, bounds.size.z);
-        const distance = maxDimension * 1.5;
+        // Only reset camera position if this is the first geometry or camera is at default position
+        const isAtDefaultPosition = camera.position.x === 50 && camera.position.y === 50 && camera.position.z === 50;
+        const isFirstLoad = !hadExistingGeometry || isAtDefaultPosition;
         
-        camera.position.set(
-          bounds.center.x + distance * 0.7,
-          bounds.center.y + distance * 0.7,
-          bounds.center.z + distance * 0.7
-        );
-        
-        controls.target.copy(bounds.center);
-        controls.update();
+        if (isFirstLoad) {
+          // Position camera to view the entire model
+          const maxDimension = Math.max(bounds.size.x, bounds.size.y, bounds.size.z);
+          const distance = maxDimension * 1.5;
+          
+          camera.position.set(
+            bounds.center.x + distance * 0.7,
+            bounds.center.y + distance * 0.7,
+            bounds.center.z + distance * 0.7
+          );
+          
+          controls.target.copy(bounds.center);
+          controls.update();
+        }
       }
 
-      // Notify parent component
-      onGeometryReady?.(shadowCasterGeometry);
+      // Notify parent component using useRef to avoid dependency issues
+      const currentCallback = onGeometryReady;
+      if (currentCallback) {
+        currentCallback(shadowCasterGeometry);
+      }
+
+      // Monitor memory after geometry generation
+      if (process.env.NODE_ENV === 'development') {
+        setTimeout(() => {
+          memoryMonitor.logMemory('after geometry generation');
+        }, 100);
+      }
 
     } catch (error) {
       console.error('Error generating geometry:', error);
     } finally {
       setIsLoading(false);
     }
-  }, [horizImageData, vertImageData, config, onGeometryReady]);
+  }, [horizImageData, vertImageData, config]);
 
   return (
     <div className="relative w-full h-full">
