@@ -1,27 +1,80 @@
-# Shadow caster
+# Shadow Caster
 
-main.dart is a dart script which reads in two .jpgs and makes an OpenSCAD script which can output an
-.stl model that does the shadow thing.
+Shadow Caster is a tool that generates 3D printable objects capable of casting different shadows from different angles. Originally implemented in Dart, this repository now includes both the original proof-of-concept and a modern web application.
 
-Fiddle with all the parameters at the top of the main function.
+## 🌐 **Try it Online**
 
-## Requirements
+**Live Demo:** https://yourusername.github.io/shadow_caster/
 
-- Dart: https://dart.dev/get-dart
-- OpenSCAD: https://openscad.org/downloads.html  (preferrably one of the development snapshots that start with 2024)
-- BOSL, an OpenSCAD library: https://github.com/revarbat/BOSL/wiki
-- My dart script's dependencies (just run `dart pub get` to get them)
+Upload your images and generate STL files directly in your browser - no installation required!
 
-Enable Fast CSG in OpenSCAD -> Edit menu -> Preferences -> `Features` tab -> fast-csg checkbox.
-Speeds up render time from minutes to seconds.
+## 📁 **Project Structure**
 
-## Workflow
+- **`/` (root)** - Original Dart implementation (proof of concept)
+- **`/web/`** - Modern React/TypeScript web application
 
-- Fiddle with the settings in main.dart.
-- Run `dart main.dart`
-- Open `output.scad` in OpenSCAD
-- Render the output (F6).  
-- Save the output (F7).
+## 🚀 **Web Application**
 
-Voila, you have your .stl to print.
+The web version provides all the functionality of the original Dart script with these advantages:
 
+### ✨ **Features**
+- **🖼️ Image Upload** - Drag & drop or select 1-2 images for horizontal/vertical shadows
+- **⚙️ Real-time Parameters** - Adjust cell size, wall width, layer height, and more
+- **🎯 Live 3D Preview** - Interactive Three.js viewer with orbit controls
+- **📁 STL Export** - Download ready-to-print STL files
+- **📱 Responsive Design** - Works on desktop, tablet, and mobile
+- **⚡ Client-side Processing** - No server required, runs entirely in your browser
+
+### 🛠️ **Technology Stack**
+- **Frontend:** React 18 + TypeScript + Vite
+- **3D Engine:** Three.js with WebGL rendering
+- **Styling:** Tailwind CSS
+- **Testing:** Vitest + Testing Library
+- **Deployment:** GitHub Pages with automated CI/CD
+
+### 🏃‍♂️ **Local Development**
+
+```bash
+cd web
+npm install
+npm run dev     # Start development server
+npm test        # Run tests
+npm run build   # Build for production
+```
+
+## 📋 **Original Dart Implementation**
+
+The original proof-of-concept requires:
+
+### Requirements
+- [Dart SDK](https://dart.dev/get-dart)
+- [OpenSCAD](https://openscad.org/downloads.html) (preferably 2024+ development snapshots)
+- [BOSL OpenSCAD library](https://github.com/revarbat/BOSL/wiki)
+
+### Usage
+```bash
+dart pub get
+dart main.dart
+# Open output.scad in OpenSCAD, render (F6), export (F7)
+```
+
+Enable Fast CSG in OpenSCAD (Edit → Preferences → Features → fast-csg) for faster rendering.
+
+## 🎨 **How It Works**
+
+1. **Image Processing** - Images are resized, converted to grayscale, and dithered for discrete height levels
+2. **Geometry Generation** - Each pixel becomes a 3D wall with height based on brightness
+3. **Shadow Casting** - Different wall arrangements create distinct shadows when lit from different angles
+4. **3D Printing** - Export as STL for physical fabrication
+
+## 🤝 **Contributing**
+
+Contributions are welcome! The web application is actively developed, while the Dart version serves as the reference implementation.
+
+## 📄 **License**
+
+See [LICENSE](LICENSE) file for details.
+
+---
+
+**Live Demo:** https://yourusername.github.io/shadow_caster/
