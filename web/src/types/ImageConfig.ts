@@ -8,7 +8,6 @@ export interface ImageConfig {
   wallWidth: number;
   bottomThk: number;
   layerHeight: number;
-  shouldDoPlusWalls: boolean;
   numberOfColorsOverride: number;
 }
 
@@ -27,7 +26,7 @@ export function computeImageConfig(config: ImageConfig): ComputedImageConfig {
   const maxHeight = numberOfColors * config.layerHeight;
   const border = config.cellSize;
   
-  const outputFilename = `${config.widthInPixels}px_${format(config.cellSize)}cell_${format(config.wallWidth)}wall_${format(maxHeight)}maxHeight_${config.horizImageFilename}_${config.vertImageFilename}_pluswalls_${config.shouldDoPlusWalls}.stl`;
+  const outputFilename = `${config.widthInPixels}px_${format(config.cellSize)}cell_${format(config.wallWidth)}wall_${format(maxHeight)}maxHeight.stl`;
   
   return {
     ...config,
@@ -52,7 +51,6 @@ export const defaultConfig: ImageConfig = {
   wallWidth: 0.4,
   bottomThk: 0.8,
   layerHeight: 0.1,
-  shouldDoPlusWalls: false,
   numberOfColorsOverride: 0,
 };
 
@@ -82,7 +80,6 @@ export const presetConfigs = {
     cellSize: 1.1,
     wallWidth: 0.22,
     bottomThk: 0.6,
-    layerHeight: 0.05,
-    shouldDoPlusWalls: false
+    layerHeight: 0.05
   }
 } as const;

@@ -36,6 +36,9 @@ export function ThreeViewer({
 
   useEffect(() => {
     if (!mountRef.current) return;
+    
+    // Prevent multiple renderers - check if one already exists
+    if (rendererRef.current) return;
 
     const width = mountRef.current.clientWidth;
     const height = mountRef.current.clientHeight;
@@ -70,22 +73,19 @@ export function ThreeViewer({
 
     // Controls
     const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
+    controls.enableDamping = false;
     controls.screenSpacePanning = false;
     controls.minDistance = 10;
     controls.maxDistance = 200;
     controlsRef.current = controls;
 
+    // Clear any existing canvas elements before appending new one
+    mountRef.current.innerHTML = '';
     mountRef.current.appendChild(renderer.domElement);
 
     // Animation loop
     const animate = () => {
       requestAnimationFrame(animate);
-      // Only update controls if damping is enabled and controls exist
-      if (controlsRef.current?.enableDamping) {
-        controlsRef.current.update();
-      }
       renderer.render(scene, camera);
     };
     animate();
@@ -125,6 +125,12 @@ export function ThreeViewer({
         mountRef.current.removeChild(renderer.domElement);
       }
       renderer.dispose();
+      
+      // Clear refs
+      sceneRef.current = null;
+      rendererRef.current = null;
+      cameraRef.current = null;
+      controlsRef.current = null;
     };
   }, []);
 

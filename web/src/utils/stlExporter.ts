@@ -41,10 +41,10 @@ export function exportToSTL(
   
   // Create a temporary mesh for the exporter
   const tempMesh = new THREE.Mesh(mergedGeometry, new THREE.MeshBasicMaterial());
-  const stlString = exporter.parse(tempMesh, { binary: false });
+  const stlData = exporter.parse(tempMesh, { binary: true });
 
-  // Create download
-  const blob = new Blob([stlString], { type: 'text/plain' });
+  // Create download (binary STL files are much smaller)
+  const blob = new Blob([stlData], { type: 'application/octet-stream' });
   const url = URL.createObjectURL(blob);
 
   const link = document.createElement('a');

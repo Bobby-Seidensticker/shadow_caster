@@ -142,15 +142,6 @@ export function ParameterControls({ config, onChange }: ParameterControlsProps) 
           <span className="text-sm">Generate vertical shadows</span>
         </label>
 
-        <label className="flex items-center space-x-2">
-          <input
-            type="checkbox"
-            checked={config.shouldDoPlusWalls}
-            onChange={handleChange('shouldDoPlusWalls')}
-            className="rounded"
-          />
-          <span className="text-sm">Add plus walls</span>
-        </label>
       </div>
     </div>
   );

@@ -32,18 +32,19 @@ export function generateShadowCasterGeometry(
           config.layerHeight
         );
 
-        const posX = config.border + (x + 1) * config.cellSize + 
-          (config.shouldDoPlusWalls ? 0.5 * (config.cellSize - config.wallWidth) : 0);
-        const posY = config.border + (horizImageData.height - y) * config.cellSize;
-        const posZ = config.bottomThk + wallHeight / 2 + config.layerHeight / 2;
+        const size = [
+          config.wallWidth,
+          config.cellSize,
+          wallHeight + config.layerHeight
+        ];
+        
+        const posX = config.border + size[0] / 2 + x * config.cellSize;
+        const posY = config.border + (horizImageData.height - y - 0.5) * config.cellSize;
+        const posZ = size[2] / 2 + config.bottomThk;
 
         leftWalls.push({
           position: [posX, posY, posZ],
-          size: [
-            config.wallWidth + 0.01,
-            config.cellSize + 0.01,
-            wallHeight + config.layerHeight
-          ]
+          size: size
         });
       }
     }
@@ -59,19 +60,34 @@ export function generateShadowCasterGeometry(
           config.layerHeight
         );
 
-        const posX = config.border + (x + 1) * config.cellSize;
-        const posY = config.border + (vertImageData.height - y) * config.cellSize + 
-          (config.shouldDoPlusWalls ? 0.5 * (config.cellSize - config.wallWidth) : 0);
-        const posZ = config.bottomThk + wallHeight / 2 + config.layerHeight / 2;
+        const size = [
+          config.cellSize,
+          config.wallWidth,
+          wallHeight + config.layerHeight
+        ];
+        
+        const posX = config.border + size[0] / 2 + x * config.cellSize;
+        const posY = config.border + (vertImageData.height - y) * config.cellSize + config.wallWidth / 2;
+        const posZ = size[2] / 2 + config.bottomThk;
 
         upWalls.push({
           position: [posX, posY, posZ],
-          size: [
-            config.cellSize + 0.01,
-            config.wallWidth + 0.01,
-            wallHeight + config.layerHeight
-          ]
+          size: size
         });
+
+
+        // const posX = config.border + (x + 1.5) * config.cellSize;
+        // const posY = config.border + (vertImageData.height - y) * config.cellSize - config.wallWidth/2;
+        // const posZ = config.bottomThk + wallHeight / 2 + config.layerHeight / 2;
+
+        // upWalls.push({
+        //   position: [posX, posY, posZ],
+        //   size: [
+        //     config.cellSize + 0.01,
+        //     config.wallWidth + 0.01,
+        //     wallHeight + config.layerHeight
+        //   ]
+        // });
       }
     }
   }
@@ -86,8 +102,8 @@ export function generateShadowCasterGeometry(
     vertImageData?.height || 0
   );
 
-  const baseWidth = config.border * 2 + config.cellSize * (imageWidth + 2);
-  const baseHeight = config.border * 2 + config.cellSize * (imageHeight + 2);
+  const baseWidth = config.border * 2 + config.cellSize * imageWidth;
+  const baseHeight = config.border * 2 + config.cellSize * imageHeight + config.wallWidth;
 
   const base: WallGeometry = {
     position: [baseWidth / 2, baseHeight / 2, config.bottomThk / 2],
