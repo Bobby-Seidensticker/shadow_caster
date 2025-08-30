@@ -32,7 +32,7 @@ export function generateShadowCasterGeometry(
           config.layerHeight
         );
 
-        const size = [
+        const size: [number, number, number] = [
           config.wallWidth,
           config.cellSize,
           wallHeight + config.layerHeight
@@ -43,7 +43,7 @@ export function generateShadowCasterGeometry(
         const posZ = size[2] / 2 + config.bottomThk;
 
         leftWalls.push({
-          position: [posX, posY, posZ],
+          position: [posX, posY, posZ] as [number, number, number],
           size: size
         });
       }
@@ -60,7 +60,7 @@ export function generateShadowCasterGeometry(
           config.layerHeight
         );
 
-        const size = [
+        const size: [number, number, number] = [
           config.cellSize,
           config.wallWidth,
           wallHeight + config.layerHeight
@@ -71,7 +71,7 @@ export function generateShadowCasterGeometry(
         const posZ = size[2] / 2 + config.bottomThk;
 
         upWalls.push({
-          position: [posX, posY, posZ],
+          position: [posX, posY, posZ] as [number, number, number],
           size: size
         });
 

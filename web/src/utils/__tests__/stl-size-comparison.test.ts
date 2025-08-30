@@ -45,6 +45,8 @@ describe('STL File Size Comparison', () => {
     };
 
     const config: ComputedImageConfig = {
+      horizImageFilename: 'test-horiz.png',
+      vertImageFilename: 'test-vert.png',
       widthInPixels: 3,
       cellSize: 4.0,
       wallWidth: 0.6,
@@ -53,6 +55,7 @@ describe('STL File Size Comparison', () => {
       bottomThk: 1.2,
       border: 1.5,
       numberOfColors: 11,
+      numberOfColorsOverride: 0,
       doHorizImage: true,
       doVertImage: false,
       outputFilename: 'size-test.stl'

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, vi } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import { generateShadowCasterGeometry } from '../geometryGenerator';
@@ -68,6 +68,8 @@ describe('Real End-to-End STL Generation', () => {
 
     // Minimal config for testing
     const config: ComputedImageConfig = {
+      horizImageFilename: 'test-horiz.png',
+      vertImageFilename: 'test-vert.png',
       widthInPixels: 2,
       cellSize: 5.0,
       wallWidth: 0.8,
@@ -76,6 +78,7 @@ describe('Real End-to-End STL Generation', () => {
       bottomThk: 1.0,
       border: 5.0,
       numberOfColors: 11, // 0.2mm layers in 2mm = 10 levels + base
+      numberOfColorsOverride: 0,
       doHorizImage: true,
       doVertImage: false,
       outputFilename: 'test-diagonal-2x2-real.stl'

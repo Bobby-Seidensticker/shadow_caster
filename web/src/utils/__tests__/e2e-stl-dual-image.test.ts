@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, vi } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import { generateShadowCasterGeometry } from '../geometryGenerator';
@@ -77,6 +77,8 @@ describe('Dual Image End-to-End STL Generation', () => {
 
 
     const config: ComputedImageConfig = {
+      horizImageFilename: 'test-horiz.png',
+      vertImageFilename: 'test-vert.png',
       widthInPixels: 2,
       cellSize: 5.0,
       wallWidth: 0.8,
@@ -85,6 +87,7 @@ describe('Dual Image End-to-End STL Generation', () => {
       bottomThk: 1.0,
       border: 0.0,
       numberOfColors: 11, // 0.2mm layers in 2mm = 10 levels + base
+      numberOfColorsOverride: 0,
       doHorizImage: true,
       doVertImage: true,
       outputFilename: 'test-dual-diagonal-2x2.stl'
@@ -204,6 +207,8 @@ describe('Dual Image End-to-End STL Generation', () => {
     };
 
     const config: ComputedImageConfig = {
+      horizImageFilename: 'test-horiz.png',
+      vertImageFilename: 'test-vert.png',
       widthInPixels: 2,
       cellSize: 4.0,
       wallWidth: 0.6,
@@ -212,6 +217,7 @@ describe('Dual Image End-to-End STL Generation', () => {
       bottomThk: 0.8,
       border: 4.0,
       numberOfColors: 11,
+      numberOfColorsOverride: 0,
       doHorizImage: true,
       doVertImage: true,
       outputFilename: 'test-comparison.stl'
