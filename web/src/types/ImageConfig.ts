@@ -26,7 +26,7 @@ export function computeImageConfig(config: ImageConfig): ComputedImageConfig {
   const maxHeight = numberOfColors * config.layerHeight;
   const border = config.cellSize;
   
-  const outputFilename = `${config.widthInPixels}px_${format(config.cellSize)}cell_${format(config.wallWidth)}wall_${format(maxHeight)}maxHeight.stl`;
+  const outputFilename = `${config.widthInPixels}px_${format(config.cellSize)}cell_${format(config.wallWidth)}wall_${format(config.bottomThk)}bottom_${format(maxHeight)}maxHeight.stl`;
   
   return {
     ...config,

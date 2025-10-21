@@ -17,6 +17,7 @@ function App() {
   const [vertImageData, setVertImageData] = useState<ProcessedImageData | null>(null);
   const [geometry, setGeometry] = useState<ShadowCasterGeometry | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [viewerEnabled, setViewerEnabled] = useState(true);
 
   const computedConfig = computeImageConfig(config);
 
@@ -88,13 +89,26 @@ function App() {
 
           <div className="space-y-6">
             <div className="bg-white p-6 rounded-lg shadow">
-              <h2 className="text-xl font-semibold mb-4">3D Preview</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold">3D Preview</h2>
+                <button
+                  onClick={() => setViewerEnabled(!viewerEnabled)}
+                  className={`px-4 py-2 rounded font-medium transition-colors ${
+                    viewerEnabled
+                      ? 'bg-red-500 hover:bg-red-600 text-white'
+                      : 'bg-green-500 hover:bg-green-600 text-white'
+                  }`}
+                >
+                  {viewerEnabled ? 'Disable Viewer' : 'Enable Viewer'}
+                </button>
+              </div>
               <div className="aspect-square bg-gray-200 rounded relative">
                 <ThreeViewer
                   horizImageData={horizImageData}
                   vertImageData={vertImageData}
                   config={computedConfig}
                   onGeometryReady={handleGeometryReady}
+                  enabled={viewerEnabled}
                 />
                 {isProcessing && (
                   <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center rounded">
@@ -108,6 +122,8 @@ function App() {
               geometry={geometry}
               config={computedConfig}
               disabled={isProcessing}
+              horizImageData={horizImageData}
+              vertImageData={vertImageData}
             />
           </div>
         </div>

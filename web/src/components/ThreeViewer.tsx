@@ -18,13 +18,15 @@ interface ThreeViewerProps {
   vertImageData: ProcessedImageData | null;
   config: ComputedImageConfig;
   onGeometryReady?: (geometry: ShadowCasterGeometry) => void;
+  enabled?: boolean;
 }
 
-export function ThreeViewer({ 
-  horizImageData, 
-  vertImageData, 
-  config, 
-  onGeometryReady 
+export function ThreeViewer({
+  horizImageData,
+  vertImageData,
+  config,
+  onGeometryReady,
+  enabled = true
 }: ThreeViewerProps) {
   const mountRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -32,6 +34,7 @@ export function ThreeViewer({
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
   const geometryGroupRef = useRef<THREE.Group | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -83,12 +86,16 @@ export function ThreeViewer({
     mountRef.current.innerHTML = '';
     mountRef.current.appendChild(renderer.domElement);
 
-    // Animation loop
+    // Animation loop - will be started by the enabled effect
     const animate = () => {
-      requestAnimationFrame(animate);
+      animationFrameRef.current = requestAnimationFrame(animate);
       renderer.render(scene, camera);
     };
-    animate();
+
+    // Start animation loop if enabled
+    if (enabled) {
+      animate();
+    }
 
     // Handle resize
     const handleResize = () => {
@@ -106,36 +113,47 @@ export function ThreeViewer({
 
     return () => {
       window.removeEventListener('resize', handleResize);
-      
+
+      // Cancel animation frame
+      if (animationFrameRef.current !== null) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+
       // Dispose of controls
       if (controlsRef.current) {
         controlsRef.current.dispose();
       }
-      
+
       // Dispose of geometry and materials
       if (geometryGroupRef.current) {
         disposeGroup(geometryGroupRef.current);
       }
-      
+
       // Dispose of cached materials
       disposeMaterialCache();
-      
+
       // Dispose of renderer
       if (mountRef.current && renderer.domElement) {
         mountRef.current.removeChild(renderer.domElement);
       }
       renderer.dispose();
-      
+
       // Clear refs
       sceneRef.current = null;
       rendererRef.current = null;
       cameraRef.current = null;
       controlsRef.current = null;
+      animationFrameRef.current = null;
     };
-  }, []);
+  }, [enabled]);
 
   useEffect(() => {
     if (!sceneRef.current || (!horizImageData && !vertImageData)) {
+      return;
+    }
+
+    // Skip geometry generation if viewer is disabled
+    if (!enabled) {
       return;
     }
 
@@ -223,11 +241,47 @@ export function ThreeViewer({
     } finally {
       setIsLoading(false);
     }
-  }, [horizImageData, vertImageData, config]);
+  }, [horizImageData, vertImageData, config, enabled, onGeometryReady]);
+
+  // Control animation loop based on enabled state
+  useEffect(() => {
+    if (!rendererRef.current || !sceneRef.current || !cameraRef.current) return;
+
+    const renderer = rendererRef.current;
+    const scene = sceneRef.current;
+    const camera = cameraRef.current;
+
+    if (enabled) {
+      // Start animation loop
+      const animate = () => {
+        animationFrameRef.current = requestAnimationFrame(animate);
+        renderer.render(scene, camera);
+      };
+      animate();
+    } else {
+      // Stop animation loop
+      if (animationFrameRef.current !== null) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+    }
+
+    return () => {
+      if (animationFrameRef.current !== null) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+    };
+  }, [enabled]);
 
   return (
     <div className="relative w-full h-full">
       <div ref={mountRef} className="w-full h-full" />
+      {!enabled && (
+        <div className="absolute inset-0 bg-gray-800 bg-opacity-90 flex items-center justify-center">
+          <div className="text-lg text-white">3D Viewer Disabled</div>
+        </div>
+      )}
       {isLoading && (
         <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center">
           <div className="text-lg">Generating 3D model...</div>
