@@ -30,6 +30,15 @@ function App() {
     setGeometry(newGeometry);
   }, []);
 
+  // Invalidate cached geometry when inputs change while viewer is disabled
+  // This prevents stale geometry from being exported with wrong config
+  useEffect(() => {
+    if (!viewerEnabled) {
+      setGeometry(null);
+    }
+  }, [config, horizImageData, vertImageData]);
+  // Note: viewerEnabled is intentionally NOT in deps - we only clear when inputs change
+
   // Process images when files or config changes
   useEffect(() => {
     const processImages = async () => {
