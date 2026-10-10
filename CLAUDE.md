@@ -48,103 +48,51 @@ dart main.dart
 - Creates wall geometries based on pixel brightness values
 - Outputs BOSL-based OpenSCAD code with proper transformations
 
-## Web Application (Modern Implementation)
+## Web Application & CLI (Modern Implementation)
 
 ### Technology Stack
-- **Frontend**: React 18 + TypeScript + Vite
-- **3D Engine**: Three.js with WebGL rendering
-- **Styling**: Tailwind CSS v3.4.17
+- **Core**: Plain TypeScript in `web/src/core/` (no DOM, no Three.js), shared by the web app and CLI
+- **Frontend**: React 19 + TypeScript + Vite, Tailwind CSS v3
+- **CLI**: `web/cli/shadow-caster.ts` run with tsx; decodes images with jpeg-js / pngjs
 - **Testing**: Vitest + Testing Library
 - **Deployment**: GitHub Pages with automated CI/CD
 
 ### Development Commands
 ```bash
 cd web
-npm install           # Install dependencies
-npm run dev          # Start development server (http://localhost:5173)
-npm test             # Run test suite
-npm run build        # Build for production
-npm run lint         # Run ESLint
+npm install
+npm run dev            # Dev server (http://localhost:5173)
+npm test -- --run      # Full test suite (~10s)
+npm run build          # tsc -b + production build
+npm run lint
+npm run cli -- --horiz a.jpg --vert b.jpg -o out.stl --preview previews/   # headless STL
 ```
 
-### Web Application Architecture
+### Architecture
 
-**Core Components**:
-- `App.tsx` - Main application with state management
-- `ImageUpload.tsx` - File upload interface for 1-2 images
-- `ParameterControls.tsx` - UI for all configuration parameters
-- `ThreeViewer.tsx` - 3D rendering with Three.js
-- `ExportButton.tsx` - STL file download functionality
+**Core pipeline** (`web/src/core/`, exported from `index.ts`):
+1. `image.ts` - `GrayImage` (Float32 0..255), Rec.601 grayscale with alpha-over-white, area-averaging resize
+2. `dither.ts` - `quantize()` to `LevelMap` (0 = white/shortest .. N-1 = black/tallest) via Floyd-Steinberg, Atkinson, Jarvis-Judice-Ninke or none; serpentine scan, gamma, error clamping
+3. `layout.ts` - one cell per pixel: left wall (horiz image, lit from -X), top/back wall (vert image, lit from +Y), corner post. Image row 0 is the +Y edge
+4. `heightfield.ts` - rasterize boxes (union = max height) onto a rectilinear grid
+5. `mesh.ts` - watertight 2-manifold indexed mesh: top faces, walls with vertical edges split at every neighbouring height (no T-junctions), bottom fan
+6. `stl.ts` - binary STL encode/decode
+7. `simulate.ts` - exact parallel-light shadow casting over the heightfield; `cellBrightness()` gives the image the print shows
+8. `framing.ts` - `Framing` = lead image (used whole, sets the grid's aspect ratio) + crop rectangle for the other image in its source pixels; `fitCrop()` narrows the crop to the lead's aspect ratio, centred. Images are only ever cropped, never stretched
+9. `pipeline.ts` - `generateModel()` / `modelToSTL()`; `fitImages()` resizes the lead to the grid width and the cropped other image to the same grid
 
-**Key Utilities**:
-- `imageProcessing.ts` - Canvas-based image resize, grayscale, dithering
-- `geometryGenerator.ts` - Convert pixels to Three.js geometry
-- `stlExporter.ts` - Export Three.js geometry as STL files
+**Web app**: `App.tsx` decodes uploads once (`browser/decodeImageFile.ts`), then `worker/client.ts` runs `worker/build.ts` in a Web Worker (inline fallback when `Worker` is missing, e.g. jsdom). Superseded requests resolve to null. The previous result is cleared as soon as inputs change, so a stale STL can never be exported. There is intentionally no 3D viewer.
 
-**Type System**:
-- `ImageConfig` interface mirrors Dart implementation
-- `ProcessedImageData` for image processing pipeline
-- `ShadowCasterGeometry` for 3D geometry representation
+**Config** (`core/config.ts`): `ImageConfig` mirrors the Dart parameters plus `dither`, `serpentine`, `gamma`, `isolationPosts`, `border` (plate margin in mm, default one cell). Framing is passed separately (`ShadowCasterInput.framing`, CLI `--lead` / `--crop`, web Framing panel). Wall top for level k = `bottomThk + (k+1) * layerHeight`; `numberOfColors = floor((cellSize - wallWidth) / layerHeight)` with an epsilon (the Dart version loses a level to float error for e.g. cell 1.2 / wall 0.4 / layer 0.1).
 
-### Important Implementation Details
-
-**Image Processing Pipeline**:
-1. File upload via HTML5 File API
-2. Canvas-based resize and grayscale conversion
-3. Floyd-Steinberg dithering for discrete height levels
-4. Real-time processing when parameters change
-
-**3D Rendering**:
-- Each pixel becomes a Three.js BoxGeometry
-- Wall heights calculated from pixel brightness (0-255 → 0-maxHeight)
-- OrbitControls for camera interaction
-- Automatic scene bounds calculation and camera positioning
-
-**Build Configuration**:
-- Vite configured for GitHub Pages deployment (`base: '/shadow_caster/'`)
-- Manual chunk splitting for optimized loading
-- TypeScript strict mode with proper type-only imports
-
-### Common Development Tasks
-
-**Adding New Parameters**:
-1. Update `ImageConfig` interface in `types/ImageConfig.ts`
-2. Add form controls in `ParameterControls.tsx`
-3. Update `computeImageConfig()` if computed values needed
-4. Test with existing presets
-
-**Modifying Geometry Generation**:
-- Core logic in `geometryGenerator.ts` mirrors Dart implementation
-- Wall positioning follows exact same formula as Dart version
-- Test changes with simple images first
-
-**Deployment**:
-- GitHub Actions automatically deploys on push to main branch
-- Builds run tests first, deploy only if tests pass
-- Live site updates within 2-3 minutes of successful push
+### Key Design Points
+- **Isolation posts** (default on with two images): the corner post is one floor width taller than the tallest wall, rounded to whole layers, so under either light it fully shades the other image's wall top. Without it, each image ghosts into the other; this was the "diagonal line across the middle" bug (Red Fuji's slope showing in the Great Wave). `simulate.test.ts` proves the independence exactly.
+- Without isolation posts, a corner post is still raised when the walls entering from the west and north are both taller than it. Otherwise they would touch only along an edge, which is non-manifold.
+- Brightness under 45° light is exactly linear in dither level; tests check this against a closed-form formula.
 
 ### Testing Strategy
-- Image processing utilities have comprehensive unit tests
-- Component tests for UI interactions and file handling
-- Build tests ensure production deployment works
-- Manual testing recommended for 3D rendering and STL export
-
-### Key Parameters (Same as Dart)
-- `widthInPixels`: Controls resolution (values >20 cause long render times)
-- `cellSize`: Width of each pixel cell in mm (includes wall width)
-- `wallWidth`: Thickness of walls within each cell
-- `maxHeight`: Maximum wall height for black pixels
-- `layerHeight`: Height increment for each brightness level
-- `numberOfColors`: Discrete height levels (auto-calculated or manual override)
-
-### Performance Considerations
-- Three.js geometry creation scales with widthInPixels²
-- Image processing is CPU-bound but cached until parameters change
-- STL export uses geometry merging for optimal file size
-- Development builds include source maps, production builds are optimized
-
-### Debugging Tips
-- Use browser dev tools for Three.js scene inspection
-- Image processing includes debug output for height distributions
-- Vite dev server has fast HMR for rapid iteration
-- Test STL files in slicing software before printing
+- `src/core/__tests__/` - unit and property tests: mesh manifoldness via `src/test/meshCheck.ts`, dithering tone and fidelity, physics checks against the simulator
+- `src/test/fixtures/` - 160px grayscale Hokusai images (public domain) used for real-photo end-to-end tests
+- `cli/__tests__/` - flag parsing, STL and preview output, subprocess runs
+- `src/__tests__/App.test.tsx` - upload → generate → download, plus the stale-export guard
+- Core and CLI tests run in the Node environment; component tests opt in with `// @vitest-environment jsdom`

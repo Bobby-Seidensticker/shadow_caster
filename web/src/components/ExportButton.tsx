@@ -1,85 +1,48 @@
-import { useState } from 'react';
-import { exportToSTL } from '../utils/stlExporter';
-import { generateShadowCasterGeometry } from '../utils/geometryGenerator';
-import type { ShadowCasterGeometry } from '../utils/geometryGenerator';
-import type { ComputedImageConfig } from '../types/ImageConfig';
-import type { ProcessedImageData } from '../utils/imageProcessing';
+import type { GenerateSuccess } from '../worker/build';
 
 interface ExportButtonProps {
-  geometry: ShadowCasterGeometry | null;
-  config: ComputedImageConfig;
-  disabled?: boolean;
-  horizImageData: ProcessedImageData | null;
-  vertImageData: ProcessedImageData | null;
+  // The model for the current inputs, or null if there is none yet (or it is out of date).
+  result: GenerateSuccess | null;
+  busy: boolean;
+  hasImages: boolean;
+  onDownload: (result: GenerateSuccess) => void;
 }
 
-export function ExportButton({ geometry, config, disabled, horizImageData, vertImageData }: ExportButtonProps) {
-  const [isGenerating, setIsGenerating] = useState(false);
-
-  const handleExport = () => {
-    // If geometry is already available, use it
-    if (geometry) {
-      try {
-        exportToSTL(geometry, config);
-      } catch (error) {
-        console.error('Error exporting STL:', error);
-        alert('Error exporting STL file. Please try again.');
-      }
-      return;
-    }
-
-    // Generate geometry on-demand if viewer was disabled
-    if (!horizImageData && !vertImageData) {
-      return;
-    }
-
-    setIsGenerating(true);
-    try {
-      const generatedGeometry = generateShadowCasterGeometry(
-        horizImageData,
-        vertImageData,
-        config
-      );
-      exportToSTL(generatedGeometry, config);
-    } catch (error) {
-      console.error('Error generating/exporting STL:', error);
-      alert('Error exporting STL file. Please try again.');
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const hasImages = horizImageData || vertImageData;
-  const canExport = !disabled && hasImages;
+export function ExportButton({ result, busy, hasImages, onDownload }: ExportButtonProps) {
+  const label = !hasImages
+    ? 'Upload images to export'
+    : busy || !result
+      ? 'Generating…'
+      : 'Download STL';
 
   return (
     <div className="p-4 bg-white rounded-lg shadow">
-      <h3 className="text-lg font-semibold mb-3">Export</h3>
-
+      <h2 className="text-lg font-semibold mb-3">Export</h2>
       <button
-        onClick={handleExport}
-        disabled={!canExport || isGenerating}
+        onClick={() => result && onDownload(result)}
+        disabled={!result || busy}
         className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-medium py-3 px-4 rounded-lg transition-colors"
       >
-        {isGenerating
-          ? 'Generating STL...'
-          : !hasImages
-            ? 'Upload images to export'
-            : 'Download STL'}
+        {label}
       </button>
 
-      {geometry && (
-        <div className="mt-3 text-sm text-gray-600">
-          <p><strong>File:</strong> {config.outputFilename}</p>
-          <p><strong>Walls:</strong> {geometry.leftWalls.length + geometry.upWalls.length}</p>
-          <p><strong>Dimensions:</strong> {Math.round(config.border * 2 + config.cellSize * config.widthInPixels)}mm</p>
-        </div>
-      )}
-
-      {!geometry && hasImages && (
-        <div className="mt-3 text-sm text-gray-500 italic">
-          Viewer disabled - geometry will be generated on export
-        </div>
+      {result && (
+        <dl className="mt-3 text-sm text-gray-600 grid grid-cols-[auto_1fr] gap-x-3">
+          <dt className="font-semibold">File</dt>
+          <dd className="break-all">{result.filename}</dd>
+          <dt className="font-semibold">Grid</dt>
+          <dd>{result.stats.cols} × {result.stats.rows} cells, {result.numberOfColors} height levels</dd>
+          <dt className="font-semibold">Size</dt>
+          <dd>
+            {result.stats.widthMm.toFixed(1)} × {result.stats.depthMm.toFixed(1)} × {result.stats.heightMm.toFixed(2)} mm
+          </dd>
+          <dt className="font-semibold">Mesh</dt>
+          <dd>
+            {result.stats.triangles.toLocaleString()} triangles, {(result.stats.stlBytes / 1e6).toFixed(1)} MB
+          </dd>
+          <dt className="font-semibold">Generated in</dt>
+          <dd>{Math.round(result.ms)} ms</dd>
+        </dl>
       )}
     </div>
   );

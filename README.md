@@ -13,22 +13,19 @@ Upload your images and generate STL files directly in your browser - no installa
 - **`/` (root)** - Original Dart implementation (proof of concept)
 - **`/web/`** - Modern React/TypeScript web application
 
-## 🚀 **Web Application**
-
-The web version provides all the functionality of the original Dart script with these advantages:
+## 🚀 **Web Application & CLI**
 
 ### ✨ **Features**
-- **🖼️ Image Upload** - Drag & drop or select 1-2 images for horizontal/vertical shadows
-- **⚙️ Real-time Parameters** - Adjust cell size, wall width, layer height, and more
-- **🎯 Live 3D Preview** - Interactive Three.js viewer with orbit controls
-- **📁 STL Export** - Download ready-to-print STL files
-- **📱 Responsive Design** - Works on desktop, tablet, and mobile
+- **🖼️ Image Upload** - Select 1-2 images for horizontal/vertical shadows
+- **⚙️ Parameters** - Cell size, wall width, layer height, dithering algorithm, gamma, and more
+- **👁️ Shadow Preview** - 2D previews of the dithered heights and a simulated shadow for each light
+- **📁 STL Export** - Watertight, 2-manifold binary STL; generation runs in a Web Worker in well under a second
+- **💻 Headless CLI** - Same engine from the command line, with optional preview PNGs
 - **⚡ Client-side Processing** - No server required, runs entirely in your browser
 
 ### 🛠️ **Technology Stack**
-- **Frontend:** React 18 + TypeScript + Vite
-- **3D Engine:** Three.js with WebGL rendering
-- **Styling:** Tailwind CSS
+- **Core:** Plain TypeScript (no DOM), shared by the web app and the CLI
+- **Frontend:** React + TypeScript + Vite + Tailwind CSS
 - **Testing:** Vitest + Testing Library
 - **Deployment:** GitHub Pages with automated CI/CD
 
@@ -40,7 +37,10 @@ npm install
 npm run dev     # Start development server
 npm test        # Run tests
 npm run build   # Build for production
+npm run cli -- --horiz great_wave.jpg --vert red_fuji.jpg --preset fuji --preview previews/
 ```
+
+See [web/README.md](web/README.md) for how the geometry works.
 
 ## 📋 **Original Dart Implementation**
 
@@ -63,7 +63,7 @@ Enable Fast CSG in OpenSCAD (Edit → Preferences → Features → fast-csg) for
 ## 🎨 **How It Works**
 
 1. **Image Processing** - Images are resized, converted to grayscale, and dithered for discrete height levels
-2. **Geometry Generation** - Each pixel becomes a 3D wall with height based on brightness
+2. **Geometry Generation** - Each pixel becomes a cell with two walls whose heights come from brightness
 3. **Shadow Casting** - Different wall arrangements create distinct shadows when lit from different angles
 4. **3D Printing** - Export as STL for physical fabrication
 

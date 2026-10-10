@@ -1,82 +1,99 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ImageUpload } from './components/ImageUpload';
 import { ParameterControls } from './components/ParameterControls';
-import { ThreeViewer } from './components/ThreeViewer';
+import { PreviewPanel } from './components/PreviewPanel';
+import { FramingControls } from './components/FramingControls';
 import { ExportButton } from './components/ExportButton';
-import { defaultConfig, computeImageConfig } from './types/ImageConfig';
-import { processImage } from './utils/imageProcessing';
-import type { ImageConfig } from './types/ImageConfig';
-import type { ProcessedImageData } from './utils/imageProcessing';
-import type { ShadowCasterGeometry } from './utils/geometryGenerator';
+import { defaultConfig, validateConfig } from './core/config';
+import type { ImageConfig } from './core/config';
+import { defaultFraming } from './core/framing';
+import type { Framing } from './core/framing';
+import type { GrayImage } from './core/image';
+import { decodeImageFile } from './browser/decodeImageFile';
+import { downloadBytes } from './browser/download';
+import { GeneratorClient } from './worker/client';
+import type { GenerateSuccess } from './worker/build';
 
-function App() {
+// Wait for typing / slider drags to settle before regenerating.
+const DEBOUNCE_MS = 200;
+
+interface AppProps {
+  // Injected by tests; defaults to the browser decoder.
+  decodeImage?: (file: File) => Promise<GrayImage>;
+}
+
+function useDecodedImage(file: File | null, decode: (file: File) => Promise<GrayImage>) {
+  const [state, setState] = useState<{ file: File | null; image: GrayImage | null; error: string | null }>(
+    { file: null, image: null, error: null },
+  );
+  useEffect(() => {
+    if (!file) return;
+    let cancelled = false;
+    decode(file).then(
+      (image) => !cancelled && setState({ file, image, error: null }),
+      (error) => !cancelled && setState({ file, image: null, error: `${file.name}: ${error instanceof Error ? error.message : 'could not decode'}` }),
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [file, decode]);
+  // Never hand out an image decoded from a previously selected file.
+  return state.file === file && file ? state : { file, image: null, error: null };
+}
+
+function App({ decodeImage = decodeImageFile }: AppProps) {
   const [config, setConfig] = useState<ImageConfig>(defaultConfig);
+  const [framing, setFraming] = useState<Framing>(defaultFraming);
   const [horizFile, setHorizFile] = useState<File | null>(null);
   const [vertFile, setVertFile] = useState<File | null>(null);
-  const [horizImageData, setHorizImageData] = useState<ProcessedImageData | null>(null);
-  const [vertImageData, setVertImageData] = useState<ProcessedImageData | null>(null);
-  const [geometry, setGeometry] = useState<ShadowCasterGeometry | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [viewerEnabled, setViewerEnabled] = useState(true);
+  const horiz = useDecodedImage(horizFile, decodeImage);
+  const vert = useDecodedImage(vertFile, decodeImage);
+  const [result, setResult] = useState<GenerateSuccess | null>(null);
+  const [generateError, setGenerateError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const clientRef = useRef<GeneratorClient | null>(null);
+  const requestId = useRef(0);
 
-  const computedConfig = computeImageConfig(config);
-
-  const handleImagesSelected = (horiz: File | null, vert: File | null) => {
-    setHorizFile(horiz);
-    setVertFile(vert);
-  };
-
-  const handleGeometryReady = useCallback((newGeometry: ShadowCasterGeometry) => {
-    setGeometry(newGeometry);
+  useEffect(() => {
+    const client = new GeneratorClient();
+    clientRef.current = client;
+    return () => client.dispose();
   }, []);
 
-  // Invalidate cached geometry when inputs change while viewer is disabled
-  // This prevents stale geometry from being exported with wrong config
+  const configValid = validateConfig(config).length === 0;
+  const horizImage = config.doHorizImage ? horiz.image : null;
+  const vertImage = config.doVertImage ? vert.image : null;
+  const hasImages = horizImage !== null || vertImage !== null;
+
   useEffect(() => {
-    if (!viewerEnabled) {
-      setGeometry(null);
+    // Anything shown from here on must match these inputs; drop the old model straight away so it
+    // can never be exported against new settings.
+    setResult(null);
+    setGenerateError(null);
+    if (!hasImages || !configValid) {
+      setBusy(false);
+      return;
     }
-  }, [config, horizImageData, vertImageData]);
-  // Note: viewerEnabled is intentionally NOT in deps - we only clear when inputs change
+    setBusy(true);
+    const id = ++requestId.current;
+    const timer = setTimeout(() => {
+      clientRef.current?.submit({ id, horiz: horizImage, vert: vertImage, config, framing }).then((response) => {
+        if (!response || response.id !== requestId.current) return;
+        setBusy(false);
+        if (response.ok) setResult(response);
+        else setGenerateError(response.error);
+      });
+    }, DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [horizImage, vertImage, config, framing, hasImages, configValid]);
 
-  // Process images when files or config changes
-  useEffect(() => {
-    const processImages = async () => {
-      if (!horizFile && !vertFile) {
-        setHorizImageData(null);
-        setVertImageData(null);
-        return;
-      }
-
-      setIsProcessing(true);
-      try {
-        const horizPromise = horizFile 
-          ? processImage(horizFile, computedConfig.widthInPixels, computedConfig.numberOfColors)
-          : Promise.resolve(null);
-        
-        const vertPromise = vertFile 
-          ? processImage(vertFile, computedConfig.widthInPixels, computedConfig.numberOfColors)
-          : Promise.resolve(null);
-
-        const [horizData, vertData] = await Promise.all([horizPromise, vertPromise]);
-        
-        setHorizImageData(horizData);
-        setVertImageData(vertData);
-      } catch (error) {
-        console.error('Error processing images:', error);
-      } finally {
-        setIsProcessing(false);
-      }
-    };
-
-    processImages();
-  }, [horizFile, vertFile, computedConfig.widthInPixels, computedConfig.numberOfColors]);
+  const errors = [horiz.error, vert.error, generateError].filter((e): e is string => e !== null);
 
   return (
     <div className="min-h-screen bg-gray-100 p-4">
       <div className="max-w-6xl mx-auto">
         <header className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-800 mb-2">Shadow Caster Web</h1>
+          <h1 className="text-4xl font-bold text-gray-800 mb-2">Shadow Caster</h1>
           <p className="text-lg text-gray-600">
             Generate 3D printable objects that cast different shadows from different angles
           </p>
@@ -85,72 +102,44 @@ function App() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="space-y-6">
             <ImageUpload
-              onImagesSelected={handleImagesSelected}
+              onImagesSelected={(h, v) => {
+                // A crop is in the old image's pixels; start a new image from all of it.
+                if (h !== horizFile || v !== vertFile) setFraming((f) => ({ ...f, crop: null }));
+                setHorizFile(h);
+                setVertFile(v);
+              }}
               horizFile={horizFile}
               vertFile={vertFile}
             />
-            
-            <ParameterControls
-              config={config}
-              onChange={setConfig}
-            />
+            {horizImage && vertImage && (
+              <FramingControls horiz={horizImage} vert={vertImage} framing={framing} onChange={setFraming} />
+            )}
+            <ParameterControls config={config} onChange={setConfig} />
           </div>
 
           <div className="space-y-6">
-            <div className="bg-white p-6 rounded-lg shadow">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold">3D Preview</h2>
-                <button
-                  onClick={() => setViewerEnabled(!viewerEnabled)}
-                  className={`px-4 py-2 rounded font-medium transition-colors ${
-                    viewerEnabled
-                      ? 'bg-red-500 hover:bg-red-600 text-white'
-                      : 'bg-green-500 hover:bg-green-600 text-white'
-                  }`}
-                >
-                  {viewerEnabled ? 'Disable Viewer' : 'Enable Viewer'}
-                </button>
-              </div>
-              <div className="aspect-square bg-gray-200 rounded relative">
-                <ThreeViewer
-                  horizImageData={horizImageData}
-                  vertImageData={vertImageData}
-                  config={computedConfig}
-                  onGeometryReady={handleGeometryReady}
-                  enabled={viewerEnabled}
-                />
-                {isProcessing && (
-                  <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center rounded">
-                    <div className="text-lg">Processing images...</div>
-                  </div>
-                )}
-              </div>
-            </div>
-
             <ExportButton
-              geometry={geometry}
-              config={computedConfig}
-              disabled={isProcessing}
-              horizImageData={horizImageData}
-              vertImageData={vertImageData}
+              result={result}
+              busy={busy}
+              hasImages={hasImages}
+              onDownload={(r) => downloadBytes(r.stl, r.filename)}
             />
+            {errors.length > 0 && (
+              <div role="alert" className="p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                {errors.map((e) => <p key={e}>{e}</p>)}
+              </div>
+            )}
+            {result && <PreviewPanel horiz={result.horizPreview} vert={result.vertPreview} />}
+            <div className="p-4 bg-white rounded-lg shadow text-sm text-gray-600 space-y-2">
+              <h2 className="text-lg font-semibold text-gray-800">Printing &amp; viewing</h2>
+              <p>
+                Print flat with the layer height set above. Light it from the left at about 45° to see
+                the horizontal image, and from the back edge to see the vertical one. A bare LED or
+                phone flashlight a metre or more away gives the sharpest shadows.
+              </p>
+            </div>
           </div>
         </div>
-
-        {(horizFile || vertFile) && (
-          <div className="mt-6 p-4 bg-white rounded-lg shadow">
-            <h3 className="font-semibold mb-2">Status</h3>
-            <div className="text-sm text-gray-600 space-y-1">
-              <p><strong>Images:</strong> {[horizFile?.name, vertFile?.name].filter(Boolean).join(', ')}</p>
-              <p><strong>Resolution:</strong> {computedConfig.widthInPixels}px</p>
-              <p><strong>Colors:</strong> {computedConfig.numberOfColors}</p>
-              <p><strong>Max Height:</strong> {computedConfig.maxHeight.toFixed(2)}mm</p>
-              {geometry && (
-                <p><strong>Total Walls:</strong> {geometry.leftWalls.length + geometry.upWalls.length}</p>
-              )}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

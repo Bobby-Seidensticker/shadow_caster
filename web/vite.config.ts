@@ -11,20 +11,14 @@ export default defineConfig({
     },
   },
   base: process.env.NODE_ENV === 'production' ? '/shadow_caster/' : '/',
-  build: {
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          'vendor-react': ['react', 'react-dom'],
-          'vendor-three': ['three', 'three-stdlib'],
-        },
-      },
-    },
-    chunkSizeWarningLimit: 1000,
+  worker: {
+    format: 'es',
   },
   test: {
     globals: true,
-    environment: 'jsdom',
+    // Core and CLI tests run in plain Node; component tests opt into jsdom with a docblock.
+    environment: 'node',
     setupFiles: './src/test/setup.ts',
+    include: ['src/**/*.test.{ts,tsx}', 'cli/**/*.test.ts'],
   },
 })

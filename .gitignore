@@ -3,3 +3,4 @@
 *.scad
 *.stl
 \.dart_tool/**
+!web/src/test/fixtures/*.png
