@@ -34,7 +34,8 @@ export interface ImageConfig {
   // Raise the post where each cell's two walls meet high enough that, under either light, it fully
   // shades the top of the wall belonging to the other image. Without this, those wall tops are
   // partly lit by an amount that depends on their height, so each image shows a faint ghost of the
-  // other.
+  // other. Only worth it when the wall tops show, i.e. a single-colour print: with walls in a dark
+  // filament over a light base, only the floor shows and it never depends on the other image.
   isolationPosts: boolean;
 }
 
@@ -94,11 +95,11 @@ export function levelTones(config: ComputedImageConfig): number[] {
     ((wallLayers(config, k) - 1) / (config.maxLayers - 1)) * steps);
 }
 
-// Height of the isolation posts, measured from the bottom of the base plate: tall enough that a
-// 45 degree shadow from the post covers the full length of the tallest wall's top, rounded up to
-// a whole layer.
-export function isolationPostTop(config: ComputedImageConfig): number {
-  const needed = config.maxHeight + (config.cellSize - config.wallWidth);
+// Height of an isolation post, measured from the bottom of the base plate: tall enough that a
+// 45 degree shadow from the post covers the full length of the top of a wall whose top is at
+// wallTopZ (by default the tallest wall), rounded up to a whole layer.
+export function isolationPostTop(config: ComputedImageConfig, wallTopZ = config.bottomThk + config.maxHeight): number {
+  const needed = wallTopZ - config.bottomThk + (config.cellSize - config.wallWidth);
   return config.bottomThk + Math.ceil(needed / config.layerHeight - EPS) * config.layerHeight;
 }
 
@@ -155,7 +156,7 @@ export const defaultConfig: ImageConfig = {
   dither: 'floyd-steinberg',
   serpentine: true,
   gamma: 1,
-  isolationPosts: true,
+  isolationPosts: false,
 };
 
 export const presetConfigs = {

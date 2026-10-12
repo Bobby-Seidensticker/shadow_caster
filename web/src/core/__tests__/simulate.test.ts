@@ -100,9 +100,9 @@ describe('shadow physics of the generated layout', () => {
   };
 
   it.each(Object.keys(presetConfigs) as (keyof typeof presetConfigs)[])(
-    'cell brightness is exactly linear in the dither level (%s preset)',
+    'with isolation posts, cell brightness is exactly linear in the dither level (%s preset)',
     (name) => {
-      const c = computeImageConfig(presetConfigs[name]);
+      const c = computeImageConfig({ ...presetConfigs[name], isolationPosts: true });
       const n = c.numberOfColors;
       // One row per level, in both images, with a different arrangement in each.
       const horiz: LevelMap = { width: n, height: n, levels: n, data: new Uint8Array(n * n) };
@@ -133,7 +133,7 @@ describe('shadow physics of the generated layout', () => {
   });
 
   it('isolation posts make each image completely independent of the other', () => {
-    const c = computeImageConfig(defaultConfig);
+    const c = computeImageConfig({ ...defaultConfig, isolationPosts: true });
     const rand = mulberry32(11);
     const horiz = randomLevels(12, 9, c.numberOfColors, rand);
     const brightness = (vert: LevelMap, direction: 'west' | 'north', h: LevelMap) => {
@@ -188,6 +188,23 @@ describe('black walls on a white base', () => {
       for (const direction of ['west', 'north'] as const) {
         expect(meanBrightness(gray, direction)).toBeCloseTo((255 * floor * (floor - wall)) / (1.1 * 1.1), 4);
       }
+    }
+  });
+
+  it('keeps each image independent of the other without isolation posts', () => {
+    const c = computeImageConfig(defaultConfig);
+    expect(c.isolationPosts).toBe(false);
+    const rand = mulberry32(12);
+    const floorOnly = (h: LevelMap, v: LevelMap, direction: 'west' | 'north') => {
+      const layout = layoutBoxes(h, v, c);
+      const hf = heightfieldFromBoxes(layout.boxes);
+      return cellBrightness(hf, castShadows(hf, direction), layout, c.cellSize, c.bottomThk).data;
+    };
+    const horiz = randomLevels(12, 9, c.numberOfColors, rand);
+    const vert = randomLevels(12, 9, c.numberOfColors, rand);
+    for (let trial = 0; trial < 5; trial++) {
+      expect(floorOnly(horiz, randomLevels(12, 9, c.numberOfColors, rand), 'west')).toEqual(floorOnly(horiz, vert, 'west'));
+      expect(floorOnly(randomLevels(12, 9, c.numberOfColors, rand), vert, 'north')).toEqual(floorOnly(horiz, vert, 'north'));
     }
   });
 

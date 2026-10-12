@@ -44,6 +44,8 @@ Parameters:
                         (default: one per layer)
   --dither <alg>        ${DITHER_ALGORITHMS.join(' | ')} (default ${defaultConfig.dither})
   --no-serpentine       Scan every row left to right when dithering
+  --isolation-posts     Raise every wall junction one floor width above its walls so a
+                        single-colour print shows no ghost of the other image
   --gamma <g>           Tone curve, darkness = 1 - gray^g (default ${defaultConfig.gamma})
   -h, --help            Show this help
 `;
@@ -82,6 +84,7 @@ export function parseCli(argv: string[]) {
       colors: { type: 'string' },
       dither: { type: 'string' },
       'no-serpentine': { type: 'boolean', default: false },
+      'isolation-posts': { type: 'boolean', default: false },
       gamma: { type: 'string' },
       help: { type: 'boolean', short: 'h', default: false },
     },
@@ -109,6 +112,7 @@ export function parseCli(argv: string[]) {
     numberOfColorsOverride: numberOption(values, 'colors') ?? base.numberOfColorsOverride,
     dither: (values.dither as DitherAlgorithm | undefined) ?? base.dither,
     serpentine: values['no-serpentine'] ? false : base.serpentine,
+    isolationPosts: values['isolation-posts'] ? true : base.isolationPosts,
     gamma: numberOption(values, 'gamma') ?? base.gamma,
     doHorizImage: values.horiz !== undefined,
     doVertImage: values.vert !== undefined,

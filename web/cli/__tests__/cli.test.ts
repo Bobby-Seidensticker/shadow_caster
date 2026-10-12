@@ -32,7 +32,7 @@ describe('parseCli', () => {
     const { config } = parseCli([
       '--horiz', 'a.png', '--vert', 'b.jpg', '--preset', 'p2', '--width', '33', '--cell', '1.5',
       '--wall', '0.3', '--bottom', '1.2', '--border', '0', '--layer', '0.08', '--colors', '6',
-      '--dither', 'atkinson', '--no-serpentine', '--gamma', '2.2',
+      '--dither', 'atkinson', '--no-serpentine', '--isolation-posts', '--gamma', '2.2',
     ]);
     expect(config).toEqual({
       ...presetConfigs.p2,
@@ -45,6 +45,7 @@ describe('parseCli', () => {
       numberOfColorsOverride: 6,
       dither: 'atkinson',
       serpentine: false,
+      isolationPosts: true,
       gamma: 2.2,
       doHorizImage: true,
       doVertImage: true,

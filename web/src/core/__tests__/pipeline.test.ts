@@ -56,7 +56,7 @@ describe('fitImages', () => {
 });
 
 describe('generateModel', () => {
-  const config: ImageConfig = { ...presetConfigs.fuji, widthInPixels: 60 };
+  const config: ImageConfig = { ...presetConfigs.fuji, widthInPixels: 60, isolationPosts: true };
 
   it('rejects missing or disabled images and invalid configs', () => {
     expect(() => generateModel({ horiz: null, vert: null, config })).toThrow(/At least one/);
@@ -85,7 +85,9 @@ describe('generateModel', () => {
     const trim = c.cellSize - c.wallWidth;
     expect(model.stats.widthMm).toBeCloseTo(60 * c.cellSize + 2 * c.border - trim, 9);
     expect(model.stats.depthMm).toBeCloseTo(model.stats.rows * c.cellSize + 2 * c.border - trim, 9);
-    expect(model.stats.heightMm).toBeCloseTo(isolationPostTop(c) - C, 9);
+    // Isolation posts are on in this test's config; none is taller than the tallest wall needs.
+    expect(model.stats.heightMm).toBeLessThanOrEqual(isolationPostTop(c) - C + 1e-9);
+    expect(model.stats.heightMm).toBeGreaterThan(c.bottomThk + c.maxHeight);
     expect(model.stats.stlBytes).toBe(stl.byteLength);
     expect(model.stats.triangles).toBe(report.triangles);
     expect(model.stats.volumeMm3).toBeCloseTo(report.volume, 0);
@@ -125,7 +127,8 @@ describe('generateModel', () => {
 });
 
 describe('end to end: the printed shadows look like the input photos', () => {
-  const config: ImageConfig = { ...defaultConfig, widthInPixels: 80 };
+  // Single-colour print: wall tops show, so isolation posts are needed to keep the images apart.
+  const config: ImageConfig = { ...defaultConfig, widthInPixels: 80, isolationPosts: true };
   const model = generateModel({ horiz: wave, vert: fuji, config });
   const { heightfield: hf, layout } = model;
   const west = cellBrightness(hf, castShadows(hf, 'west'), layout, config.cellSize);

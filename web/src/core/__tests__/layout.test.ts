@@ -76,11 +76,46 @@ describe('layoutBoxes', () => {
     }
   });
 
-  it('raises every wall junction to the isolation post height when both images are used', () => {
-    const layout = layoutBoxes(levelMap([[0, 4], [16, 2]]), levelMap([[1, 1], [9, 0]]), c);
-    const posts = layout.boxes.filter((b) => near(b.x1 - b.x0, ww) && near(b.y1 - b.y0, ww));
-    expect(posts).toHaveLength(4);
-    for (const post of posts) expect(post.z).toBeCloseTo(isolationPostTop(c) - C, 12);
+  it('with isolation posts, raises each junction one floor width above its own taller wall', () => {
+    const ic = config({ isolationPosts: true });
+    const horiz = levelMap([[0, 4], [8, 2]]);
+    const vert = levelMap([[1, 1], [6, 0]]);
+    const layout = layoutBoxes(horiz, vert, ic);
+    const postAt = (i: number, r: number) => {
+      const x0 = border + i * cs;
+      const y1 = layout.cellY[r] + cs;
+      const found = findBox(layout.boxes, { x0, x1: x0 + ww, y0: y1 - ww, y1 });
+      expect(found).toHaveLength(1);
+      return found[0].z;
+    };
+    const post = (level: number) => isolationPostTop(ic, wallTop(ic, level)) - C;
+    // Cell (0, 0) has both walls; the last column has no top wall and the last row no left wall.
+    expect(postAt(0, 0)).toBeCloseTo(post(Math.max(0, 1)), 12);
+    expect(postAt(1, 0)).toBeCloseTo(post(4), 12);
+    expect(postAt(0, 1)).toBeCloseTo(post(6), 12);
+    // The far corner has no walls of its own: a fixed height, no taller than the tallest wall.
+    expect(postAt(1, 1)).toBeCloseTo(ic.bottomThk + ic.maxHeight - C, 12);
+    expect(post(0)).toBeLessThan(post(8));
+    expect(post(8)).toBeCloseTo(isolationPostTop(ic) - C, 12);
+  });
+
+  it('by default, makes each junction only as tall as the walls meeting there', () => {
+    const horiz = levelMap([[0, 4, 1], [2, 5, 5], [8, 8, 8]]);
+    const vert = levelMap([[1, 1, 8], [6, 0, 3], [2, 2, 2]]);
+    const layout = layoutBoxes(horiz, vert, c);
+    const postAt = (i: number, r: number) => {
+      const x0 = border + i * cs;
+      const y1 = layout.cellY[r] + cs;
+      return Math.max(0, ...findBox(layout.boxes, { x0, x1: x0 + ww, y0: y1 - ww, y1 }).map((b) => b.z));
+    };
+    // Interior junctions are just the taller of their two walls, so no post rises above them
+    // (there is no diagonal-only contact to fix here).
+    for (const [i, r] of [[0, 0], [1, 0], [0, 1], [1, 1]]) expect(postAt(i, r)).toBe(0);
+    // Along the last row and column, just tall enough to shade the bare strip next to them.
+    for (const [i, r] of [[2, 0], [2, 1], [0, 2], [1, 2]]) {
+      expect(postAt(i, r)).toBeCloseTo(isolationPostTop(c, c.bottomThk) - C, 12);
+    }
+    expect(isolationPostTop(c, c.bottomThk) - (c.bottomThk + c.maxHeight)).toBeLessThanOrEqual(c.layerHeight + 1e-9);
   });
 
   it('leaves out the top walls east of the last left wall and the left walls south of the last top wall', () => {
@@ -118,16 +153,19 @@ describe('layoutBoxes', () => {
     const plain = config({ isolationPosts: false });
     // Cell (1, 1) is short; the wall running in from the west (top wall of cell (0, 1)) and the
     // one from the north (left wall of cell (1, 0)) are both tall.
-    const horiz = levelMap([[0, 12], [0, 0]]);
-    const vert = levelMap([[0, 0], [10, 0]]);
+    const horiz = levelMap([[0, 7, 0], [0, 0, 0], [0, 0, 0]]);
+    const vert = levelMap([[0, 0, 0], [6, 0, 0], [0, 0, 0]]);
     const layout = layoutBoxes(horiz, vert, plain);
     const x0 = border + cs;
     const y1 = layout.cellY[1] + cs;
     const posts = findBox(layout.boxes, { x0, x1: x0 + ww, y0: y1 - ww, y1 });
     expect(posts).toHaveLength(1);
-    expect(posts[0].z).toBeCloseTo(wallTop(plain, 10) - C, 12);
-    // No other junction needed raising.
-    expect(layout.boxes.filter((b) => near(b.x1 - b.x0, ww) && near(b.y1 - b.y0, ww))).toHaveLength(1);
+    expect(posts[0].z).toBeCloseTo(wallTop(plain, 6) - C, 12);
+    // No other interior junction needed raising. The edge ones are all the fixed edge height and
+    // the far corner is the tallest wall height.
+    const raised = layout.boxes.filter((b) => near(b.x1 - b.x0, ww) && near(b.y1 - b.y0, ww));
+    const fixed = [isolationPostTop(plain, plain.bottomThk) - C, plain.bottomThk + plain.maxHeight - C];
+    expect(raised.filter((b) => !fixed.some((z) => near(b.z, z)))).toHaveLength(1);
   });
 
   it('keeps every top surface just below a whole layer so no slicer plane can land on it', () => {

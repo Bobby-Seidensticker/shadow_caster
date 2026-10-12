@@ -125,7 +125,7 @@ export function ParameterControls({ config, onChange }: ParameterControlsProps) 
         </label>
         <label className="flex items-center space-x-2">
           <input type="checkbox" checked={config.isolationPosts} onChange={setBoolean('isolationPosts')} className="rounded" />
-          <span className="text-sm">Isolation posts (stops each image ghosting into the other)</span>
+          <span className="text-sm">Isolation posts (single-colour prints: stops each image ghosting into the other)</span>
         </label>
       </div>
 

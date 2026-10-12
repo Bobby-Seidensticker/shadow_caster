@@ -48,16 +48,16 @@ export interface Layout {
 // the light at 45 degrees the shadow length equals the wall height, and the tallest wall equals
 // the open floor width, so a black pixel's floor is fully shaded.
 //
-// P is the post where the left wall meets the top wall. Under light from the left, the top wall's
-// own top surface sits in the path of P's shadow; under light from the back, so does the left
-// wall's. If P were just the taller of the two walls, how much of that surface is shaded would
-// depend on the other image, ghosting it into this one (e.g. a diagonal mountainside showing up
-// across a different picture). With isolationPosts, P is tall enough to always shade those strips
-// completely, so each image's shadow depends only on its own walls.
+// P is the post where the left wall meets the top wall. Normally it is just the taller of the two,
+// raised further only when the walls running into it from the west and north are both taller;
+// otherwise those two would touch only along a vertical edge, which is not a valid (2-manifold)
+// solid and confuses slicers.
 //
-// Without isolation posts, P is the taller of its two walls, raised further when the walls running
-// into it from the west and north are both taller; otherwise those two would touch only along a
-// vertical edge, which is not a valid (2-manifold) solid and confuses slicers.
+// With isolationPosts, P is raised so that, under light from the left, it completely shades the
+// top of this cell's top wall, and under light from the back, the top of its left wall. Otherwise
+// how much of those wall tops is lit depends on the other image's wall height, ghosting it into
+// this one (e.g. a diagonal mountainside showing up across a different picture). Each post is only
+// as tall as its own taller wall needs: one open floor width above it, in whole layers.
 export function layoutBoxes(
   horiz: LevelMap | null,
   vert: LevelMap | null,
@@ -104,7 +104,8 @@ export function layoutBoxes(
     i < 0 || r < 0 || i >= cols || r >= rows ? 0 : arr[r * cols + i];
 
   const isolate = config.isolationPosts && horiz !== null && vert !== null;
-  const tallPost = isolationPostTop(config) - SLICE_PLANE_CLEARANCE;
+  const edgePost = isolationPostTop(config, config.bottomThk) - SLICE_PLANE_CLEARANCE;
+  const tallestWall = config.bottomThk + config.maxHeight - SLICE_PLANE_CLEARANCE;
   const boxes: Box[] = [{ x0: 0, y0: 0, x1: width, y1: depth, z: bottomThk - SLICE_PLANE_CLEARANCE }];
   for (let r = 0; r < rows; r++) {
     const y0 = cellY[r];
@@ -118,7 +119,22 @@ export function layoutBoxes(
       if (t > 0) boxes.push({ x0, y0: y1 - ww, x1, y1, z: t });
       const fromWest = at(top, i - 1, r);
       const fromNorth = at(left, i, r - 1);
-      const post = isolate ? tallPost : Math.max(l, t, Math.min(fromWest, fromNorth));
+      const taller = Math.max(l, t);
+      let post: number;
+      if (horiz && vert && taller === 0) {
+        // The far corner cell has no walls of its own. A fixed height keeps it from depending on
+        // either image while still joining the two walls that meet there.
+        post = Math.min(fromWest, fromNorth) > 0 ? tallestWall : 0;
+      } else if (isolate) {
+        post = isolationPostTop(config, taller + SLICE_PLANE_CLEARANCE) - SLICE_PLANE_CLEARANCE;
+      } else if (horiz && vert && (l === 0 || t === 0)) {
+        // In the last column (no top wall) or last row (no left wall), the strip where the missing
+        // wall would be is bare plate, and the neighbouring cell's wall of the other image can
+        // shade it. A post one floor width tall shades that strip completely under either light.
+        post = edgePost;
+      } else {
+        post = Math.max(taller, Math.min(fromWest, fromNorth));
+      }
       if (post > Math.max(l, t)) boxes.push({ x0, y0: y1 - ww, x1: x0 + ww, y1, z: post });
     }
   }

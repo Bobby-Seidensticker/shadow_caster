@@ -25,7 +25,7 @@ describe('ParameterControls', () => {
     fireEvent.change(screen.getByLabelText('Dithering'), { target: { value: 'atkinson' } });
     expect(onChange).toHaveBeenLastCalledWith({ ...defaultConfig, dither: 'atkinson' });
     fireEvent.click(screen.getByLabelText(/isolation posts/i));
-    expect(onChange).toHaveBeenLastCalledWith({ ...defaultConfig, isolationPosts: false });
+    expect(onChange).toHaveBeenLastCalledWith({ ...defaultConfig, isolationPosts: true });
   });
 
   it('shows the preset matching the current settings, starting with the 0.2mm nozzle default', () => {
